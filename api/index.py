@@ -4,7 +4,10 @@ from flask import Flask, request, Response, render_template
 # Get the base directory (parent of api folder)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-CHUNK_SIZE = 1024 * 200  # chunks size
+DEFAULT_CHUNK_SIZE = 1024 * 200  # 200KB default
+
+# Valid chunk sizes in KB
+VALID_CHUNK_SIZES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1024]
 
 app = Flask(
     __name__,
@@ -19,14 +22,14 @@ def home():
     return render_template('index.html')
 
 
-def stream_video(video_path, start, end):
+def stream_video(video_path, start, end, chunk_size):
     """Generator function to stream video in chunks."""
     with open(video_path, 'rb') as f:
         f.seek(start)
         remaining = end - start + 1
         while remaining > 0:
-            chunk_size = min(CHUNK_SIZE, remaining)
-            data = f.read(chunk_size)
+            read_size = min(chunk_size, remaining)
+            data = f.read(read_size)
             if not data:
                 break
             remaining -= len(data)
@@ -40,6 +43,7 @@ def avatar():
     
     Query Parameters:
         state: 'nodding' or 'speaking'
+        chunk_size: chunk size in KB (100, 200, 300, 400, 500, 600, 700, 800, 900, 1024)
     
     Returns:
         MP4 video stream with support for range requests (seeking)
@@ -48,6 +52,13 @@ def avatar():
     
     if state not in ['nodding', 'speaking']:
         return {'error': 'Invalid state. Use "nodding" or "speaking".'}, 400
+    
+    # Parse chunk_size parameter
+    chunk_size_kb = request.args.get('chunk_size', type=int)
+    if chunk_size_kb and chunk_size_kb in VALID_CHUNK_SIZES:
+        chunk_size = chunk_size_kb * 1024
+    else:
+        chunk_size = DEFAULT_CHUNK_SIZE
     
     video_path = os.path.join(BASE_DIR, 'static', 'videos', f'avatar-{state}.mp4')
     
@@ -75,7 +86,7 @@ def avatar():
         }
         
         return Response(
-            stream_video(video_path, start, end),
+            stream_video(video_path, start, end, chunk_size),
             status=206,  # Partial Content
             headers=headers,
             mimetype='video/mp4'
@@ -89,7 +100,7 @@ def avatar():
         }
         
         return Response(
-            stream_video(video_path, 0, file_size - 1),
+            stream_video(video_path, 0, file_size - 1, chunk_size),
             status=200,
             headers=headers,
             mimetype='video/mp4'
