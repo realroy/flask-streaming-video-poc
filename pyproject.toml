@@ -1,0 +1,9 @@
+[project]
+name = "flask-video-streaming-poc"
+version = "0.1.0"
+description = "Flask video streaming POC with Vercel deployment"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.0.0",
+]
