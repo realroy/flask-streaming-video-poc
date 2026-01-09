@@ -144,7 +144,6 @@
     
     <div class="video-container">
         <video id="avatar-video" autoplay loop playsinline>
-            <source src="/api/v1/avatar?state=nodding&chunk_size=200" type="video/mp4">
             Your browser does not support the video tag.
         </video>
     </div>
@@ -158,9 +157,9 @@
 
     <div class="settings">
         <label for="chunk-size">Chunk Size:</label>
-        <select id="chunk-size" onchange="updateVideo()">
+        <select id="chunk-size" onchange="changeChunkSize()">
             <option value="100">100 KB</option>
-            <option value="200" selected>200 KB</option>
+            <option value="200">200 KB</option>
             <option value="300">300 KB</option>
             <option value="400">400 KB</option>
             <option value="500">500 KB</option>
@@ -173,41 +172,97 @@
     </div>
 
     <script>
-        let currentState = 'nodding';
+        const VALID_STATES = ['nodding', 'speaking'];
+        const VALID_CHUNK_SIZES = ['100', '200', '300', '400', '500', '600', '700', '800', '900', '1024'];
+        const DEFAULT_STATE = 'nodding';
+        const DEFAULT_CHUNK_SIZE = '200';
 
-        function getVideoUrl(state) {
-            const chunkSize = document.getElementById('chunk-size').value;
-            return `/api/v1/avatar?state=${state}&chunk_size=${chunkSize}`;
+        let currentState = DEFAULT_STATE;
+        let currentChunkSize = DEFAULT_CHUNK_SIZE;
+
+        function getUrlParams() {
+            return new URLSearchParams(window.location.search);
+        }
+
+        function updateUrlParams() {
+            const params = new URLSearchParams();
+            params.set('state', currentState);
+            params.set('chunk_size', currentChunkSize);
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            history.replaceState(null, '', newUrl);
+        }
+
+        function getVideoUrl() {
+            return `/api/v1/avatar?state=${currentState}&chunk_size=${currentChunkSize}`;
         }
 
         function updateVideo() {
             const video = document.getElementById('avatar-video');
-            video.src = getVideoUrl(currentState);
+            video.src = getVideoUrl();
             video.load();
             video.play();
         }
 
-        function changeState(state) {
-            if (state === currentState) return;
-            
-            currentState = state;
-            const video = document.getElementById('avatar-video');
-            const statusSpan = document.getElementById('current-state');
-            
-            // Update video source
-            video.src = getVideoUrl(state);
-            video.load();
-            video.play();
-            
+        function updateUI() {
             // Update status text
-            statusSpan.textContent = state;
+            document.getElementById('current-state').textContent = currentState;
             
             // Update button states
             document.querySelectorAll('.btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.querySelector(`.btn-${state}`).classList.add('active');
+            document.querySelector(`.btn-${currentState}`).classList.add('active');
+            
+            // Update chunk size select
+            document.getElementById('chunk-size').value = currentChunkSize;
         }
+
+        function changeState(state) {
+            if (state === currentState) return;
+            if (!VALID_STATES.includes(state)) return;
+            
+            currentState = state;
+            updateUrlParams();
+            updateUI();
+            updateVideo();
+        }
+
+        function changeChunkSize() {
+            const newChunkSize = document.getElementById('chunk-size').value;
+            if (newChunkSize === currentChunkSize) return;
+            
+            currentChunkSize = newChunkSize;
+            updateUrlParams();
+            updateVideo();
+        }
+
+        function initFromUrl() {
+            const params = getUrlParams();
+            
+            // Read state from URL
+            const urlState = params.get('state');
+            if (urlState && VALID_STATES.includes(urlState)) {
+                currentState = urlState;
+            }
+            
+            // Read chunk_size from URL
+            const urlChunkSize = params.get('chunk_size');
+            if (urlChunkSize && VALID_CHUNK_SIZES.includes(urlChunkSize)) {
+                currentChunkSize = urlChunkSize;
+            }
+            
+            // Update URL to ensure both params are present
+            updateUrlParams();
+            
+            // Update UI to match state
+            updateUI();
+            
+            // Load video with current settings
+            updateVideo();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initFromUrl);
     </script>
 </body>
 </html>
